@@ -1,10 +1,19 @@
+import time
+
+import psutil
+import pyautogui
+from PyDictionary import PyDictionary
 import pyttsx3
+from bs4 import BeautifulSoup
 from decouple import config
 from datetime import datetime
 import speech_recognition as sr
+import webbrowser
+import sys
 from random import choice
 from utils import opening_text
 import requests
+import subprocess
 from functions.online_ops import find_my_ip, get_latest_news, get_random_advice, get_random_joke, get_trending_movies, \
     get_weather_report, play_on_youtube, search_on_google, search_on_wikipedia, send_email, send_whatsapp_message
 from functions.os_ops import open_calculator, open_camera, open_cmd, open_notepad, open_nfs, open_pycharm
@@ -61,7 +70,7 @@ def take_user_input():
 
     try:
         print('Recognizing...')
-        query = r.recognize_google(audio, language='en-in')
+        query = r.recognize_google(audio, language='en-GH')
         if not 'exit' in query or 'stop' in query:
             speak(choice(opening_text))
         else:
@@ -163,17 +172,113 @@ if __name__ == '__main__':
             print(*get_trending_movies(), sep='\n')
 
         elif 'news' in query:
-            speak(f"I'm reading out the latest news headlines, sir")
-            speak(get_latest_news())
-            speak("For your convenience, I am printing it on the screen sir.")
-            print(*get_latest_news(), sep='\n')
+            api_key = '9bb9b456bf124f80aba6a0e09cc2f811'
+            URL = 'https://newsapi.org/v2/top-headlines?country=us&apiKey=' + api_key
+
+            resp = requests.get(URL)
+            if resp.status_code == 200:
+                data = resp.json()
+                news = data['articles'][0]
+                speak(news['title'])
+                speak(news['description'])
+            else:
+                speak("Cannot find a news at this moment")
+
+        elif "current info" in query or "latest info" in query:
+            url = "https://www.ghanaweb.com/GhanaHomePage/NewsArchive/"
+            page = requests.get(url)
+            soup = BeautifulSoup(page.content, 'html.parser')
+
+            # Find all the headlines on the page
+            headlines = soup.find_all("h2")
+            for headline in headlines[:4]:
+                print(headline.text)
+                speak(headline.text)
 
         elif 'weather' in query:
-            ip_address = find_my_ip()
-            city = requests.get(f"https://.ipapico/{ip_address}/city/").text
-            speak(f"Getting weather report for your city {city}")
-            weather, temperature, feels_like = get_weather_report(city)
-            speak(f"The current temperature is {temperature}, but it feels like {feels_like}")
-            speak(f"Also, the weather report talks about {weather}")
-            speak("For your convenience, I am printing it on the screen sir.")
-            print(f"Description: {weather}\nTemperature: {temperature}\nFeels like: {feels_like}")
+            api_key = "8ef61edcf1c576d65d836254e11ea420"
+            base_url = "https://api.openweathermap.org/data/2.5/weather?"
+            speak("What is the name of the city?")
+            city_name = take_user_input().lower()
+
+            print(f"{city_name} whether conditions : ")
+
+            complete_url = base_url + "appid=" + api_key + "&q=" + city_name
+            response = requests.get(complete_url)
+            x = response.json()
+            if x["cod"] != "404":
+                y = x["main"]
+                current_temperature = y["temp"] - 273.15
+                current_temperature = float('%.2f' % current_temperature)
+                current_humidity = y["humidity"]
+                z = x["weather"]
+                weather_description = z[0]["description"]
+                speak(" Temperature in Celsius unit is " +
+                      str(current_temperature) +
+                      "\n humidity in percentage is " +
+                      str(current_humidity) +
+                      "\n description  " +
+                      str(weather_description))
+                print(" Temperature in Celsius unit = " +
+                      str(current_temperature) +
+                      "\n humidity (in percentage) = " +
+                      str(current_humidity) +
+                      "\n description = " +
+                      str(weather_description))
+            else:
+                speak("Can't find details about this city")
+
+
+        elif 'search flight' in query:
+            speak("What is the source of the Flight Sir!!")
+            source = take_user_input().lower()
+            speak("What is the Destination of the Flight Sir!!")
+            destination = take_user_input().lower()
+            # speak("What is the Travel date sir Please speak in numeric format")
+            # traveldate = takeCommand()
+            # webbrowser.open(f"https://www.google.com/search?q={search_go}")
+            # webbrowser.open(f"https://www.makemytrip.com/flight/search?itinerary={source}-{destination}-25/01/2023-&tripType=O&paxType=A-1_C-0_I-0&intl=false&=&cabinClass=E")
+            webbrowser.open(
+                f"https://www.makemytrip.com/flight/search?itinerary={source}-{destination}-26/01/2023&tripType=O&paxType=A-2_C-0_I-0&intl=false&cabinClass=E&ccde=IN&lang=eng")
+
+        elif 'shut up' in query or 'sleep' in query:
+            speak('Alright Sir! Ping me up when you need me again')
+            sys.exit(0)
+
+        elif 'thank you' in query or 'appreciate' in query:
+            speak("It's my duty to assist you anytime sir")
+
+        elif "log off" in query or "sign out" in query:
+            speak(
+                "Ok , your pc will log off in 10 seconds! make sure you exit from all applications")
+            subprocess.call(["shutdown", "/l"])
+
+        elif 'battery' in query:
+            battery = psutil.sensors_battery()
+            percentage = battery.percent
+            speak(f'{USERNAME} our System still has {percentage} percent battery')
+            if percentage >= 75:
+                print("\U0001F601")
+                speak(f'{USERNAME} we have enough power to continue our work!')
+            elif 40 <= percentage < 75:
+                speak(
+                    f'{USERNAME} we should think of connecting our system to the battery supply!')
+            elif 40 >= percentage >= 15:
+                speak(
+                    f"{USERNAME} we don't have enough power to work through!... Connect now sir!")
+            elif percentage < 15:
+                speak(
+                    f'{USERNAME} we have very low power!... Our System may Shutdown anytime soon!...')
+
+        elif "switch the window" in query or "switch window" in query:
+            speak(f"Okay {USERNAME}, Switching the window")
+            pyautogui.keyDown("alt")
+            pyautogui.press("tab")
+            pyautogui.keyUp("alt")
+        elif 'screenshot' in query:
+            speak("Taking screenshot")
+            times = time.time()
+            name_img = r"{}.png".format(str(times))
+            img = pyautogui.screenshot(name_img)
+            speak("Done!")
+            img.show()
